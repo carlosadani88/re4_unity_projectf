@@ -1,6 +1,6 @@
 # VILL4GE — Setup no Unity (RE4 Tribute Edition)
 
-## Pre-requisitos
+## Pré-requisitos
 - **Unity 2021.3 LTS** ou superior (recomendado: 2022.3 LTS)
 - Template **3D (Built-in Render Pipeline)**
 
@@ -23,7 +23,7 @@
 
 ### 4. Controles (estilo RE4)
 
-| Tecla | Acao |
+| Tecla | Ação |
 |---|---|
 | WASD | Mover |
 | Mouse | Olhar |
@@ -109,7 +109,7 @@ SightAngleHalf = 55
 
 ### 6. Assembly Definitions (asmdef)
 
-| Assembly | Pasta | Proposito |
+| Assembly | Pasta | Propósito |
 |---|---|---|
 | RE4Core | Scripts/Core/ | Input e servicos centrais |
 | RE4Gameplay | Scripts/Gameplay/ | Sistemas de gameplay |

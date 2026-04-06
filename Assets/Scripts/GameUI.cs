@@ -375,7 +375,7 @@ public class GameUI : MonoBehaviour
         StartCoroutine(ShowTemporaryMessage("★ AREA CLEARED", new Color32(220, 200, 60, 255), 3f));
     }
 
-    System.Collections.IEnumerator ShowTemporaryMessage(string msg, Color32 col, float duration)
+    IEnumerator ShowTemporaryMessage(string msg, Color32 col, float duration)
     {
         // Create a temporary label in the center of the canvas
         if (!canvas) yield break;

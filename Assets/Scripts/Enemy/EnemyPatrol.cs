@@ -44,6 +44,10 @@ public class EnemyPatrol : MonoBehaviour
     [Tooltip("Layer mask for sight line-of-sight raycasts.")]
     public LayerMask obstructionMask = ~0;
 
+    // ── Constants ─────────────────────────────────────────────────────────
+    /// <summary>Vertical offset for sight raycasts (eye level).</summary>
+    const float EYE_HEIGHT_OFFSET = 1.5f;
+
     // ── State ─────────────────────────────────────────────────────────────
     public enum PatrolState { Idle, MovingToWaypoint, Alerted }
     public PatrolState CurrentState { get; private set; } = PatrolState.Idle;
@@ -194,7 +198,7 @@ public class EnemyPatrol : MonoBehaviour
             {
                 // Line-of-sight raycast
                 if (!Physics.Raycast(
-                        transform.position + Vector3.up * 1.5f,
+                        transform.position + Vector3.up * EYE_HEIGHT_OFFSET,
                         toPlayer.normalized, dist,
                         obstructionMask, QueryTriggerInteraction.Ignore))
                 {

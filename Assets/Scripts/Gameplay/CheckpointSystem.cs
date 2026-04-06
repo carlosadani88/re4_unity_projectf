@@ -27,6 +27,11 @@ public class CheckpointSystem : MonoBehaviour
     [Tooltip("Show HUD message on activation.")]
     public bool showMessage = true;
 
+    // ── Visual dimensions ────────────────────────────────────────────────
+    const float VISUAL_WIDTH   = 2f;
+    const float VISUAL_HEIGHT  = 3f;
+    const float VISUAL_DEPTH   = 0.1f;
+
     bool _activated = false;
 
     // ─────────────────────────────────────────────────────────────────────
@@ -92,7 +97,7 @@ public class CheckpointSystem : MonoBehaviour
         _visual.name = "CheckpointVisual";
         _visual.transform.SetParent(transform);
         _visual.transform.localPosition = Vector3.zero;
-        _visual.transform.localScale    = new Vector3(2f, 3f, 0.1f);
+        _visual.transform.localScale    = new Vector3(VISUAL_WIDTH, VISUAL_HEIGHT, VISUAL_DEPTH);
 
         Destroy(_visual.GetComponent<Collider>());
 
