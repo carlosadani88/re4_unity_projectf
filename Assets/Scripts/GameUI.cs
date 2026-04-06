@@ -5,6 +5,7 @@
 // ============================================================================
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class GameUI : MonoBehaviour
 {
@@ -361,6 +362,48 @@ public class GameUI : MonoBehaviour
         var rt = img.rectTransform; rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
         return go;
     }
+    // ── Checkpoint / encounter messages ───────────────────────────────────
+    /// <summary>Show a brief "CHECKPOINT" banner on screen.</summary>
+    public void ShowCheckpointMessage(int index)
+    {
+        StartCoroutine(ShowTemporaryMessage($"✓ CHECKPOINT {index + 1}", new Color32(80, 200, 80, 255), 3f));
+    }
+
+    /// <summary>Show "AREA CLEARED" banner when an EnemySpawner finishes.</summary>
+    public void ShowEncounterClearedMessage()
+    {
+        StartCoroutine(ShowTemporaryMessage("★ AREA CLEARED", new Color32(220, 200, 60, 255), 3f));
+    }
+
+    System.Collections.IEnumerator ShowTemporaryMessage(string msg, Color32 col, float duration)
+    {
+        // Create a temporary label in the center of the canvas
+        if (!canvas) yield break;
+        var go   = new GameObject("TempMsg");
+        go.transform.SetParent(canvas.transform, false);
+        var txt  = go.AddComponent<Text>();
+        txt.text      = msg;
+        txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.fontSize  = 22;
+        txt.fontStyle = FontStyle.Bold;
+        txt.color     = col;
+        txt.alignment = TextAnchor.MiddleCenter;
+        var rt = txt.rectTransform;
+        rt.anchorMin  = new Vector2(0.2f, 0.6f);
+        rt.anchorMax  = new Vector2(0.8f, 0.7f);
+        rt.offsetMin  = rt.offsetMax = Vector2.zero;
+
+        float t = 0;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float alpha  = t < 0.3f ? t / 0.3f : (t > duration - 0.5f ? (duration - t) / 0.5f : 1f);
+            txt.color    = new Color32(col.r, col.g, col.b, (byte)(alpha * 255));
+            yield return null;
+        }
+        Destroy(go);
+    }
+
     Button MakeBtn(Transform par, string label, Vector2 anc, Vector2 sz)
     {
         var go = new GameObject("Btn"); go.transform.SetParent(par, false);

@@ -611,4 +611,22 @@ public class Player : MonoBehaviour
         if (GameUI.I) GameUI.I.FlashDamage();
         if (hp <= 0) { hp = 0; GameManager.I.PlayerDied(); }
     }
+
+    // ── SaveSystem helpers ────────────────────────────────────────────────
+    /// <summary>Alias for money (pesetas) — used by SaveSystem.</summary>
+    public int pesetas { get => money; set => money = value; }
+
+    /// <summary>Wrapper used by SaveSystem to switch to a specific weapon slot.</summary>
+    public void SwitchToSlot(int slot)
+    {
+        slot = Mathf.Clamp(slot, 0, weapons.Length - 1);
+        if (weapons[slot].owned)
+        {
+            curWeapon = slot;
+            CreateViewModel();
+        }
+    }
+
+    /// <summary>Alias so external scripts can read the current weapon index.</summary>
+    public int currentWeapon { get => curWeapon; set { curWeapon = value; } }
 }
