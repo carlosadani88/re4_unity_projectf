@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────
+# VILL4GE — RE4 Unity Project .gitignore
+# ─────────────────────────────────────────────────
+
+# ── Unity ────────────────────────────────────────
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+MemoryCaptures/
+Recordings/
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+
+# ── IDE ──────────────────────────────────────────
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.VC.db
+*.tmp
+
+# ── OS ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Python (projeto antigo) ─────────────────────
+__pycache__/
+*.pyc
+.venv/
+projeto_antigo/.venv/
+projeto_antigo/__pycache__/
+
+# ── Modelos 3D (arquivos grandes) ───────────────
+Modelos/*.zip
