@@ -19,6 +19,22 @@ public class Enemy : MonoBehaviour
     // Propriedade pública para sistema de chute
     public bool IsStaggered => staggerTimer > 0 && !isDead;
 
+    // ── Estado público para patrol/spawner ────────────────────────────────
+    /// <summary>True quando o inimigo está morto.</summary>
+    public bool IsDead => isDead;
+
+    /// <summary>True quando o inimigo está ativamente perseguindo o jogador.</summary>
+    public bool IsChasing => !isDead && staggerTimer <= 0 && knockbackVel.magnitude < .1f;
+
+    bool _alerted = false;
+
+    /// <summary>
+    /// Chamado pelo EnemyPatrol para iniciar perseguição imediata.
+    /// O Update() já persegue o jogador por padrão; este método apenas
+    /// pode ser usado para resetar estados de patrulha.
+    /// </summary>
+    public void Alert(Transform target) { _alerted = true; }
+
     CharacterController cc;
     GameObject body, head, legL, legR, armL, armR, weaponObj;
     GameObject hpBarBg, hpBarFill;

@@ -67,6 +67,13 @@ public class GameManager : MonoBehaviour
         // Attaché Case (maleta RE4)
         var caseObj = new GameObject("AttacheCase");
         caseObj.AddComponent<AttacheCase>();
+        // Core services (lazy-instantiated if not present in scene)
+        if (!FindObjectOfType<AudioManager>())
+            new GameObject("AudioManager").AddComponent<AudioManager>();
+        if (!FindObjectOfType<SaveSystem>())
+            new GameObject("SaveSystem").AddComponent<SaveSystem>();
+        if (!FindObjectOfType<InputManager>())
+            new GameObject("InputManager").AddComponent<InputManager>();
     }
 
     void InitMats()

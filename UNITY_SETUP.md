@@ -10,61 +10,145 @@
 1. **Unity Hub** → **New Project** → template **3D (Core)** → nome `VILLAG`
 
 ### 2. Importar scripts
-1. Copie `Assets/Scripts/` → `<Projeto>/Assets/Scripts/`
-   - 7 classes em 7 arquivos (.cs) + 1 classe utility `TorchFlicker`
+1. Copie toda a pasta `Assets/` para `<SeuProjeto>/Assets/`
+   - Scripts em `Assets/Scripts/` (subdiretorios: Core, Audio, Enemy, Gameplay, Save, UI)
+   - Pastas vazias: Scenes, Prefabs, Art, Audio, UI, Settings, Resources
 2. Unity compila automaticamente
 
 ### 3. Configurar a cena
 1. Na SampleScene, **delete** `Main Camera` e `Directional Light`
 2. **GameObject → Create Empty** → renomear `GameBootstrap`
 3. **Add Component** → `GameManager`
-4. **Play!**
+4. **Play!** — tudo é gerado proceduralmente
 
 ### 4. Controles (estilo RE4)
 
-| Tecla         | Ação                          |
-|---------------|-------------------------------|
-| WASD          | Mover (lento ao mirar)        |
-| Mouse         | Olhar                         |
-| **RMB**       | **Mirar (over-the-shoulder)** |
-| **LMB**       | **Atirar (mirando) / Faca**   |
-| Shift         | Sprint (sem mirar)            |
-| R             | Recarregar                    |
-| Scroll / 1-5  | Trocar arma                   |
-| G             | Granada                       |
-| H             | Usar erva (+40 HP)            |
-| E             | Falar com Merchant            |
+| Tecla | Ação |
+|---|---|
+| WASD | Mover |
+| Mouse | Olhar |
+| RMB (segurar) | Mirar over-the-shoulder |
+| LMB | Atirar (mirando) / Faca (quadril) |
+| Shift | Sprint |
+| R | Recarregar |
+| Scroll / 1-5 | Trocar arma |
+| F | Chute (inimigo staggered) |
+| G | Granada |
+| H | Erva (+40 HP) |
+| V | Faca |
+| E | Merchant |
+| Tab | Attache Case (inventario) |
+| Escape | Pause |
+| F5 | Quick Save |
+| F9 | Quick Load |
 
-### 5. Features RE4-faithful
-- **Câmera over-the-shoulder** com offset, FOV dinâmico
-- **Mira laser vermelha** (aparece ao segurar RMB)
-- **Faca** (LMB sem mirar = melee slash)
-- **4 tipos de Ganado**: Villager (foice), Pitchfork (forcado), Heavy (machado), **Dr. Salvador (motosserra!)**
-- **Headshot** = dano ×3 + cabeça explode com partículas de sangue
-- **Stagger** ao acertar inimigos (Chainsaw só com headshot)
-- **Vila procedural**: igreja com torre/cruz/sino, cemitério com lápides, fogueira central, casas com telhado, caminhos de terra, cercas, carroças, feno, poços
-- **Tochas com flicker** (luzes que variam de intensidade)
-- **Iluminação sombria**: sol fraco, ambient trilight escuro, fog exponencial
-- **Chuva** via ParticleSystem
-- **Merchant**: "What are ya buyin'?" — capa roxa, olhos brilhantes, tapete de itens
-- **HUD**: barra LIFE, munição estilo RE4, moeda ₧ (pesetas), kill counter
-- **Wave Intro** com anúncio "— WAVE X —"
-- **Tela de morte**: "YOU ARE DEAD" (RE4 style)
-- **Muzzle flash** + **hit sparks**
-- **Vignette** que intensifica com dano
+### 5. Novos sistemas (v2)
 
-### 6. Estrutura
+#### InputManager (`Scripts/Core/InputManager.cs`)
+Abstrai todos os inputs em propriedades simples. Para trocar para o novo Input System, modifique apenas este arquivo.
 
-| Arquivo               | Responsabilidade                                    |
-|-----------------------|-----------------------------------------------------|
-| `GameManager.cs`      | Vila procedural, igreja, fogueira, cenário, waves   |
-| `Player.cs`           | OTS camera, laser, 5 armas, faca, granada, chuva   |
-| `Enemy.cs`            | 4 tipos Ganado, armas, headshot, stagger, grab      |
-| `GameUI.cs`           | HUD RE4, merchant panel, wave intro, death screen   |
-| `Pickup.cs`           | Drops (erva/munição/pesetas)                        |
-| `GrenadeProjectile.cs`| Timer + explosão em área + luz dinâmica             |
+```csharp
+// Exemplos de uso:
+InputManager.I.AimHeld      // bool — RMB segurado
+InputManager.I.FireDown     // bool — LMB pressionado neste frame
+InputManager.I.MouseSensitivity  // float — configuravel no Inspector
+```
 
-### 7. Performance
-- Objetos de cenário marcados `isStatic` para batching
+#### AudioManager (`Scripts/Audio/AudioManager.cs`)
+Pool de 16 AudioSources para SFX + fonte dedicada para musica.
+
+```csharp
+AudioManager.I.PlaySFX(AudioManager.SFX.Gunshot);
+AudioManager.I.PlayMusic(AudioManager.Music.Combat);
+AudioManager.I.SetVolumes(master: 1f, sfx: 0.8f, music: 0.6f);
+```
+
+Para adicionar clips: selecione o `AudioManager` na cena e arraste
+AudioClips para os campos `Sfx Entries` / `Music Entries` no Inspector.
+
+#### SaveSystem (`Scripts/Save/SaveSystem.cs`)
+Salva HP, armas/municao, pesetas, ervas, wave, kills e posicao em JSON.
+
+- **F5** = Quick Save (slot 0)
+- **F9** = Quick Load (slot 0)
+- Arquivos em `Application.persistentDataPath/saves/` (nunca commitados)
+
+```csharp
+SaveSystem.I.Save(slot: 1);   // salvar no slot 1
+SaveSystem.I.Load(slot: 1);   // carregar slot 1
+bool exists = SaveSystem.I.SlotExists(2);
+```
+
+#### CheckpointSystem (`Scripts/Gameplay/CheckpointSystem.cs`)
+Auto-save quando o jogador entra num trigger.
+
+Setup:
+1. Crie um GameObject com BoxCollider (IsTrigger = true)
+2. Adicione o componente `CheckpointSystem`
+3. Configure `checkpointIndex` (unico por checkpoint) e `saveSlot`
+
+#### EnemySpawner (`Scripts/Enemy/EnemySpawner.cs`)
+Spawner por encontro com configuracao de waves no Inspector.
+
+```
+Waves[0]: villagers=3, pitchforks=1, startDelay=0, spawnInterval=0.5
+Waves[1]: villagers=2, heavies=1, startDelay=2, spawnInterval=0.8
+Waves[2]: chainsaws=1, heavies=2, startDelay=1, spawnInterval=1.0
+```
+
+#### EnemyPatrol (`Scripts/Enemy/EnemyPatrol.cs`)
+Patrulha com waypoints ou aleatoria. Deteccao de som (circulo) e visao (cone).
+
+```
+Mode = Waypoints
+Waypoints = [wp1, wp2, wp3]
+HearRadius = 6
+SightRadius = 14
+SightAngleHalf = 55
+```
+
+### 6. Assembly Definitions (asmdef)
+
+| Assembly | Pasta | Propósito |
+|---|---|---|
+| RE4Core | Scripts/Core/ | Input e servicos centrais |
+| RE4Gameplay | Scripts/Gameplay/ | Sistemas de gameplay |
+| RE4Enemy | Scripts/Enemy/ | IA e spawning de inimigos |
+
+Asmdef aceleram compilacao: apenas os assemblies modificados recompilam.
+
+### 7. Estrutura de scripts
+
+| Script | Responsabilidade |
+|---|---|
+| `GameManager.cs` | Vila procedural, church, fogueira, cenario, waves |
+| `Player.cs` | OTS camera, laser, 5 armas, faca, kick, chuva |
+| `Enemy.cs` | 4 tipos Ganado, headshot, stagger, grab |
+| `GameUI.cs` | HUD, merchant, wave intro, death screen, checkpoints |
+| `AttacheCase.cs` | Maleta grid (inventario RE4) |
+| `Pickup.cs` | Drops (erva/municao/pesetas) |
+| `GrenadeProjectile.cs` | Timer + explosao + luz dinamica |
+| `Core/InputManager.cs` | Abstracao de input |
+| `Audio/AudioManager.cs` | Pool de SFX + musica |
+| `Save/SaveSystem.cs` | Save/Load JSON |
+| `Gameplay/CheckpointSystem.cs` | Checkpoint trigger + auto-save |
+| `Enemy/EnemySpawner.cs` | Spawner de encontros configuravel |
+| `Enemy/EnemyPatrol.cs` | Patrulha + deteccao |
+
+### 8. Performance
+- Objetos de cenario marcados `isStatic` para static batching
 - **Window → Rendering → Lighting → Generate Lighting** para bake
-- Shadow Distance: 45m (configurado via código)
+- Shadow Distance: 45m (configurado em codigo)
+- Pool de SFX no AudioManager evita Instantiate/Destroy de AudioSources
+
+### 9. Git LFS (recomendado)
+O `.gitattributes` ja esta configurado para rastrear arquivos grandes via LFS.
+
+Para ativar:
+```bash
+git lfs install
+git lfs track "*.fbx" "*.obj" "*.png" "*.wav"
+```
+
+Arquivos de modelos 3D em `Modelos/` devem usar LFS para evitar repositorio lento.
+

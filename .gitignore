@@ -1,8 +1,8 @@
-# ─────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # VILL4GE — RE4 Unity Project .gitignore
-# ─────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 
-# ── Unity ────────────────────────────────────────
+# Unity generated folders
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -12,6 +12,10 @@
 [Uu]ser[Ss]ettings/
 MemoryCaptures/
 Recordings/
+ExportedObj/
+.consolehistory
+
+# Unity build artifacts
 *.pidb.meta
 *.pdb.meta
 *.mdb.meta
@@ -21,8 +25,14 @@ sysinfo.txt
 *.unitypackage
 *.app
 crashlytics-build.properties
+*.ipa
+*.symbols.zip
 
-# ── IDE ──────────────────────────────────────────
+# JetBrains / Rider
+.idea/
+*.sln.DotSettings.user
+
+# IDEs
 .vs/
 .vscode/
 *.csproj
@@ -38,17 +48,27 @@ crashlytics-build.properties
 *.VC.db
 *.tmp
 
-# ── OS ───────────────────────────────────────────
+# OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
-# ── Python (projeto antigo) ─────────────────────
+# Python (projeto antigo)
 __pycache__/
 *.pyc
 .venv/
 projeto_antigo/.venv/
 projeto_antigo/__pycache__/
 
-# ── Modelos 3D (arquivos grandes) ───────────────
+# Modelos 3D (grandes - usar Git LFS)
 Modelos/*.zip
+
+# Game saves (local only, nao commitar)
+saves/
+
+# Editor crash/dump files
+*.crash
+*.dmp

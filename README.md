@@ -3,137 +3,197 @@
 ![Unity](https://img.shields.io/badge/Unity-2021.3%2B-blue?logo=unity)
 ![C#](https://img.shields.io/badge/C%23-Scripts-239120?logo=csharp)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-Active-yellow)
 
-> Jogo de sobrevivência em terceira pessoa inspirado em **Resident Evil 4**, feito inteiramente com código procedural em Unity — sem assets, sem prefabs, tudo via C#.
-
----
-
-## Screenshots (In-Game)
-
-*O jogo gera tudo proceduralmente: vila, inimigos, armas, UI — basta dar Play.*
+> Third-person survival horror inspired by **Resident Evil 4**, built in Unity with procedural C#.
+> Hit **Play** and everything generates at runtime — no external assets needed.
 
 ---
 
-## Features RE4-Faithful
+## Quick Start
 
-### Gameplay
-- **Câmera Over-the-Shoulder** — Offset dinâmico (hip/aim), FOV 70→55
-- **Mira Laser Vermelha** — Aparece ao segurar RMB (LineRenderer + dot emissivo)
-- **5 Armas**: Handgun, Shotgun, Rifle, TMP, Rocket Launcher
-- **Faca Melee** — LMB sem mirar = slash de faca
-- **Roundhouse Kick** — Pressione `F` em inimigo staggered (knockback + dano em área)
-- **Granadas** — Timer 2s, explosão com luz dinâmica, dano em área 6m
-- **Attaché Case (Maleta)** — Grid de inventário estilo RE4 com rotação de itens
+### Requirements
+- **Unity 2021.3 LTS** or newer (recommended: **2022.3 LTS**)
+- **3D (Built-in Render Pipeline)** template
+- No additional packages required
 
-### Inimigos (Ganados)
-- **Villager** — Foice, chapéu de camponês
-- **Pitchfork** — Forcado 3 pontas, mais rápido
-- **Heavy** — Machado, 140 HP, lento e forte
-- **Dr. Salvador (Chainsaw!)** — Saco na cabeça, motosserra, 350 HP, sem stagger
+### Setup (5 minutes)
 
-### Sistemas
-- **Headshot** — Dano ×3, cabeça explode com partículas de sangue
-- **Stagger** — Inimigos cambaleiam ao tomar dano (exceto Chainsaw)
-- **Kick System** — Prompt contextual `[F] KICK` quando inimigo está staggered
-- **Wave System** — Ondas crescentes com spawn inteligente
-- **Merchant** — *"What are ya buyin'?"* — Compre armas, munição, ervas, upgrades
-- **Attaché Case** — Grid 10×6 (expansível até 14×8), armas ocupam espaços diferentes
-
-### Ambiente
-- **Vila Procedural 70×70**: Igreja com torre/cruz/sino, cemitério, fogueira central
-- **6 Casas** com telhado e cumeeira, caminhos de terra
-- **Cenário**: Barris, caixotes, árvores, tochas, poços, feno, cercas, carroças, lápides
-- **Tochas com flicker** (luz oscilante realista)
-- **Chuva** via ParticleSystem (3000 partículas)
-- **Fog Exponencial** + Ambient Trilight escuro
-
-### UI
-- Barra **LIFE** estilo RE4 (bottom-left)
-- Munição e nome da arma (bottom-right)
-- Moeda **₧ (Pesetas)**
-- Wave intro *"— WAVE X —"*
-- Tela de morte *"YOU ARE DEAD"*
-- **Damage vignette** que intensifica com dano
+1. **Unity Hub** → **New Project** → **3D (Core)**
+2. Copy the `Assets/` folder into your new project
+3. In SampleScene, **delete** `Main Camera` and `Directional Light`
+4. **GameObject → Create Empty** → rename it `GameBootstrap`
+5. **Add Component → GameManager**
+6. Press **Play** — village, enemies, UI and systems spawn automatically
 
 ---
 
-## Estrutura do Projeto
+## Controls
+
+| Key / Button | Action |
+|---|---|
+| WASD | Move (slower while aiming) |
+| Mouse | Look |
+| RMB (hold) | **Aim over-the-shoulder** |
+| LMB | **Shoot (aiming) / Knife (hip)** |
+| Shift | Sprint |
+| R | Reload |
+| Scroll / 1-5 | Switch weapon |
+| F | **Roundhouse kick** (enemy staggered) |
+| G | Throw grenade |
+| H | Use herb (+40 HP) |
+| V | Knife |
+| E | Talk to Merchant |
+| Tab | Open **Attache Case** (inventory) |
+| Escape | Pause menu |
+| F5 | **Quick Save** |
+| F9 | **Quick Load** |
+
+---
+
+## Feature List
+
+### Gameplay (RE4-Faithful)
+- **Over-the-shoulder camera** with dynamic offset, FOV 70 to 55 when aiming
+- **Red laser sight** on RMB hold (LineRenderer + emissive dot)
+- **5 weapons**: Handgun, Shotgun, Rifle, TMP, Rocket Launcher
+- **Knife melee**, **roundhouse kick** on stagger, **grenades**
+- **Healing herbs**, sprint with headbob
+- **Attache Case** grid inventory with item rotation
+
+### Weapons
+
+| Weapon | Damage | Mag | Reserve |
+|---|---|---|---|
+| Handgun | 18 | 12 | 60 |
+| Shotgun | 90 | 6 | 24 |
+| Rifle | 50 | 10 | 30 |
+| TMP | 10 | 50 | 200 |
+| Rocket Launcher | 350 | 1 | 3 |
+
+### Enemy AI (Ganados)
+
+| Type | HP | Speed | Notes |
+|---|---|---|---|
+| Villager | 60 | 2.2 | Sickle |
+| Pitchfork | 50 | 2.8 | Faster |
+| Heavy | 140 | 1.6 | High damage |
+| Dr. Salvador | 350 | 3.2 | Chainsaw, no stagger |
+
+- **Headshot** = 3x damage + head explodes with particles
+- **Stagger** on hit, contextual kick prompt
+- **Patrol AI** (EnemyPatrol.cs): waypoint/random wander + hear/sight detection
+- **Wave system** + configurable **EnemySpawner** per encounter area
+
+### Core Systems
+
+| System | Script | Description |
+|---|---|---|
+| InputManager | Core/InputManager.cs | Centralized input wrapper |
+| AudioManager | Audio/AudioManager.cs | 16-source SFX pool + music layers |
+| SaveSystem | Save/SaveSystem.cs | JSON save/load (5 slots), F5/F9 shortcuts |
+| CheckpointSystem | Gameplay/CheckpointSystem.cs | Trigger-based auto-save with visual indicator |
+| EnemySpawner | Enemy/EnemySpawner.cs | Designer-friendly per-encounter wave configs |
+| EnemyPatrol | Enemy/EnemyPatrol.cs | Waypoint patrol + hear/sight cone detection |
+| Attache Case | AttacheCase.cs | Grid inventory (10x6, expandable to 14x8) |
+| Merchant | GameUI.cs | Buy/sell weapons, ammo, upgrades with pesetas |
+
+### UI / HUD
+- LIFE bar (bottom-left), ammo counter + weapon name (bottom-right)
+- Pesetas display, wave counter, kill count
+- Wave intro banner, YOU ARE DEAD screen
+- Damage vignette, kick prompt overlay
+- Pause menu, checkpoint + area-cleared messages
+
+### Procedural Village (70x70)
+- Church with bell tower, cemetery, central bonfire (dynamic flicker)
+- 6 houses, fences, carts, barrels, trees, torches, wells
+- Exponential fog, dim trilight ambient, rain (3000 particles)
+
+---
+
+## Project Structure
 
 ```
 re4_unity_projectf/
 ├── Assets/
-│   └── Scripts/
-│       ├── GameManager.cs      # Vila procedural, waves, lighting, scenery
-│       ├── Player.cs           # OTS camera, laser, 5 armas, faca, kick, chuva
-│       ├── Enemy.cs            # 4 tipos Ganado, headshot, stagger, knockback
-│       ├── GameUI.cs           # HUD RE4, merchant, wave intro, death screen
-│       ├── AttacheCase.cs      # Maleta grid com rotação (inventário RE4)
-│       ├── Pickup.cs           # Drops: erva, ammo, pesetas
-│       └── GrenadeProjectile.cs # Granada com explosão + luz
-├── Modelos/                    # Modelos 3D (Leon, Handgun, Vila RE4)
-├── projeto_antigo/             # Versões anteriores (Python/Ursina/Pygame)
-├── UNITY_SETUP.md              # Guia de setup detalhado
+│   ├── Scripts/
+│   │   ├── Core/          InputManager.cs, RE4Core.asmdef
+│   │   ├── Audio/         AudioManager.cs
+│   │   ├── Enemy/         Enemy.cs, EnemyPatrol.cs, EnemySpawner.cs
+│   │   ├── Gameplay/      CheckpointSystem.cs, GrenadeProjectile.cs, Pickup.cs
+│   │   ├── Save/          SaveSystem.cs
+│   │   ├── VILL4GE.asmdef (root assembly, references RE4Core)
+│   │   ├── GameManager.cs (village, waves, lighting, materials)
+│   │   ├── Player.cs      (OTS camera, 5 weapons, kick, rain)
+│   │   ├── GameUI.cs      (HUD, merchant, menus)
+│   │   └── AttacheCase.cs (grid inventory)
+│   ├── Scenes/
+│   ├── Prefabs/
+│   ├── Art/   (Materials/, Textures/)
+│   ├── Audio/ (Music/, SFX/)
+│   ├── UI/    (Fonts/, Sprites/)
+│   ├── Settings/
+│   └── Resources/
+├── Modelos/           3D model files (Git LFS recommended)
+├── projeto_antigo/    Old Python/Pygame prototypes
+├── README.md
+├── UNITY_SETUP.md     Detailed setup guide
+├── CONTRIBUTING.md
+├── LICENSE            MIT
 ├── .gitignore
-└── README.md
+└── .gitattributes     Git LFS + line endings
 ```
 
 ---
 
-## Setup Rápido
+## Save System
 
-### Requisitos
-- **Unity 2021.3 LTS** ou superior (recomendado 2022.3 LTS)
-- Template **3D (Built-in Render Pipeline)**
+Saves player HP, weapons/ammo, pesetas, herbs, wave, kills, position.
+Files stored in `Application.persistentDataPath/saves/` (not committed to git).
 
-### Passo a Passo
-1. **Unity Hub** → New Project → **3D (Core)** → nome que quiser
-2. Copie `Assets/Scripts/` para `<SeuProjeto>/Assets/Scripts/`
-3. Na cena, **delete** `Main Camera` e `Directional Light`
-4. **GameObject → Create Empty** → renomear `GameBootstrap`
-5. **Add Component** → `GameManager`
-6. **Play!**
+| Key | Action |
+|---|---|
+| F5 | Quick Save (slot 0) |
+| F9 | Quick Load (slot 0) |
+
+Add a **CheckpointSystem** component on any trigger collider to auto-save on player entry.
 
 ---
 
-## Controles
+## Assembly Definitions
 
-| Tecla | Ação |
-|-------|------|
-| WASD | Mover (lento ao mirar) |
-| Mouse | Olhar |
-| **RMB** | **Mirar (over-the-shoulder)** |
-| **LMB** | **Atirar (mirando) / Faca (sem mirar)** |
-| **F** | **Kick (inimigo staggered)** |
-| Shift | Sprint |
-| R | Recarregar |
-| Scroll / 1-5 | Trocar arma |
-| **TAB** | **Abrir Attaché Case (maleta)** |
-| G | Granada |
-| H | Usar erva (+40 HP) |
-| E | Falar com Merchant |
+| Assembly | Path | Purpose |
+|---|---|---|
+| `RE4Core` | `Scripts/Core/` | InputManager (no external deps) |
+| `VILL4GE` | `Scripts/` | All gameplay scripts (auto-references RE4Core) |
 
----
-
-## Modelos 3D Incluídos
-
-A pasta `Modelos/` contém assets para uso futuro:
-- `resident-evil-4-leon/` — Modelo do Leon
-- `t77-handgun/` — Modelo da pistola
-- `village-re4/` — Cenário da vila
+Assembly definitions speed up compile times by only recompiling changed assemblies.
 
 ---
 
 ## Roadmap
 
-- [ ] Importar modelos 3D no lugar dos primitivos
-- [ ] Sistema de áudio (tiros, passos, ambient, motosserra)
-- [ ] Boss fight (El Gigante / Del Lago)
-- [ ] Animações com Animator Controller
-- [ ] Save system
-- [ ] Otimização (LOD, object pooling)
+- [ ] Import 3D models (replace procedural primitives)
+- [ ] Audio clips (gunshots, footsteps, chainsaw, ambient)
+- [ ] Animator Controller with walk/aim/shoot blend trees
+- [ ] Boss fight placeholder (El Gigante)
+- [ ] Door / key / puzzle system
+- [ ] Save slot selection UI
+- [ ] Object pooling for enemies and projectiles
+- [ ] LOD system for performance
+- [ ] Controller / mobile input support
 
 ---
 
-## Créditos
+## Asset Licensing
 
-Inspirado em **Resident Evil 4** da Capcom. Este é um projeto de estudo/tribute, sem fins comerciais.
+All assets are **procedurally generated via C#** (Unity primitives, dynamic materials, lights, particles).
+No copyrighted Resident Evil 4 assets are included.
+This is a non-commercial fan tribute for educational purposes.
+
+See [LICENSE](LICENSE) for full license terms.
+
+---
+
+*Inspired by Resident Evil 4 (Capcom, 2005 / 2023). Not affiliated with or endorsed by Capcom.*
