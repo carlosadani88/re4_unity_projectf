@@ -143,7 +143,7 @@ public class EnemySpawner : MonoBehaviour
         go.transform.rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
 
         var enemy = go.AddComponent<Enemy>();
-        enemy.Init(type);
+        enemy.Init(type, alertedOnSpawn: false);
 
         _aliveEnemies.Add(enemy);
         if (GameManager.I) GameManager.I.enemiesAlive++;

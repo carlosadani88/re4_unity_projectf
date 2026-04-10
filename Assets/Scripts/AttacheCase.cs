@@ -6,6 +6,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System;
 
 public class AttacheCase : MonoBehaviour
 {
@@ -24,7 +25,7 @@ public class AttacheCase : MonoBehaviour
     GameObject casePanel;
     Image[,] cellImages;
     Image bgPanel;
-    Text titleText, infoText, controlsText;
+    Text titleText, infoText, controlsText, sizeText;
     GameObject infoPanel;
     const int CELL = 48;
     const int PAD = 2;
@@ -63,6 +64,13 @@ public class AttacheCase : MonoBehaviour
         new Color(.35f, .35f, .4f),    // TMP      - cinza azulado
         new Color(.5f, .25f, .15f),    // Rocket   - vermelho escuro
     };
+
+    public static Vector2Int GetWeaponFootprint(int weaponIdx)
+    {
+        if (weaponIdx < 0 || weaponIdx >= WeaponSizes.Length)
+            return Vector2Int.zero;
+        return new Vector2Int(WeaponSizes[weaponIdx][0], WeaponSizes[weaponIdx][1]);
+    }
 
     // ====================================================================
     void Awake()
@@ -151,7 +159,7 @@ public class AttacheCase : MonoBehaviour
         infoRt.sizeDelta = new Vector2(260, 280);
 
         // Controles
-        controlsText = MkText(casePanel.transform, "[TAB] Close  |  Click: Select  |  R: Rotate  |  RMB: Move  |  Arrow Keys: Navigate",
+        controlsText = MkText(casePanel.transform, "[TAB] Close  |  Click: Select  |  R: Rotate  |  T: Auto-sort  |  Arrow Keys: Select",
             13, TextAnchor.LowerCenter, new Vector2(.5f, 0f), new Vector2(0, 20));
         controlsText.color = new Color(.5f, .45f, .35f);
 
@@ -160,6 +168,8 @@ public class AttacheCase : MonoBehaviour
             TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(20, 20));
         sizeText.color = new Color(.5f, .45f, .35f);
         sizeText.name = "SizeLabel";
+        this.sizeText = sizeText;
+        UpdateCaseMeta();
     }
 
     // ====================================================================
@@ -373,10 +383,101 @@ public class AttacheCase : MonoBehaviour
         CreateUI();
         casePanel.SetActive(isOpen);
         RefreshGrid();
+        UpdateCaseMeta();
         return true;
     }
 
     public bool IsMaxSize => gridW >= 14 && gridH >= 8;
+
+    public void SetSize(int width, int height)
+    {
+        width = Mathf.Clamp(width, 10, 14);
+        height = Mathf.Clamp(height, 6, 8);
+
+        gridW = width;
+        gridH = height;
+        grid = new int[gridW, gridH];
+
+        if (casePanel) Destroy(casePanel);
+        CreateUI();
+        casePanel.SetActive(isOpen);
+        RefreshGrid();
+        UpdateCaseMeta();
+    }
+
+    public void ClearAllItems()
+    {
+        items.Clear();
+        nextId = 1;
+        selectedIdx = -1;
+        if (grid != null) Array.Clear(grid, 0, grid.Length);
+        RefreshGrid();
+    }
+
+    public void RebuildWeaponsFromPlayer(Player player)
+    {
+        if (!player || player.weapons == null) return;
+
+        ClearAllItems();
+        for (int i = 0; i < player.weapons.Length; i++)
+        {
+            if (player.weapons[i].owned)
+                AddWeaponToCase(i);
+        }
+
+        RefreshGrid();
+    }
+
+    public bool AutoOrganize()
+    {
+        if (items.Count <= 1)
+        {
+            RefreshGrid();
+            return true;
+        }
+
+        int selectedId = selectedIdx >= 0 && selectedIdx < items.Count ? items[selectedIdx].id : 0;
+        var oldOrder = new List<CaseItem>(items);
+        int[] oldGX = new int[items.Count];
+        int[] oldGY = new int[items.Count];
+        bool[] oldRot = new bool[items.Count];
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            oldGX[i] = items[i].gx;
+            oldGY[i] = items[i].gy;
+            oldRot[i] = items[i].rotated;
+        }
+
+        var ordered = new List<CaseItem>(items);
+        ordered.Sort(CompareItemsForPacking);
+        Array.Clear(grid, 0, grid.Length);
+
+        foreach (var item in ordered)
+        {
+            if (!TryPlaceAuto(item))
+            {
+                items = oldOrder;
+                Array.Clear(grid, 0, grid.Length);
+                for (int i = 0; i < items.Count; i++)
+                {
+                    items[i].gx = oldGX[i];
+                    items[i].gy = oldGY[i];
+                    items[i].rotated = oldRot[i];
+                    PlaceOnGrid(items[i]);
+                }
+                selectedIdx = FindItemIndexById(selectedId);
+                RefreshGrid();
+                return false;
+            }
+        }
+
+        items = ordered;
+        selectedIdx = FindItemIndexById(selectedId);
+        if (selectedIdx < 0 && items.Count > 0) selectedIdx = 0;
+        RefreshGrid();
+        return true;
+    }
 
     // ====================================================================
     // REFRESH VISUAL
@@ -417,6 +518,7 @@ public class AttacheCase : MonoBehaviour
 
         // Info do item selecionado
         UpdateInfoPanel();
+        UpdateCaseMeta();
     }
 
     void UpdateInfoPanel()
@@ -442,6 +544,7 @@ public class AttacheCase : MonoBehaviour
             info += $"Magazine: {w.ammoInMag}/{w.magSize}\n";
             info += $"Reserve: {w.ammoReserve}\n";
             info += $"Reload: {w.reloadTime:F1}s\n";
+            info += $"Tune-Up: {GameManager.I.player.GetWeaponLevelSummary(item.weaponIdx)}\n";
             if (w.spread > 0) info += $"Spread: {w.spread:F2}\n";
             if (w.explosive) info += "EXPLOSIVE\n";
             info += $"\nEquipped: {(GameManager.I.player.curWeapon == item.weaponIdx ? "YES" : "NO")}";
@@ -479,6 +582,11 @@ public class AttacheCase : MonoBehaviour
         // Click = selecionar item
         if (Input.GetMouseButtonDown(0)) HandleClick();
 
+        HandleDirectionalSelection();
+
+        if (Input.GetKeyDown(KeyCode.T))
+            AutoOrganize();
+
         // Número = equipar arma direto
         for (int i = 0; i < 5; i++)
         {
@@ -491,7 +599,7 @@ public class AttacheCase : MonoBehaviour
                     {
                         if (GameManager.I?.player)
                         {
-                            GameManager.I.player.curWeapon = i;
+                            GameManager.I.player.SwitchToSlot(i);
                             selectedIdx = j;
                             RefreshGrid();
                         }
@@ -550,7 +658,7 @@ public class AttacheCase : MonoBehaviour
             // Se clicou em arma, equipa
             if (selectedIdx >= 0 && items[selectedIdx].type == ItemType.Weapon && GameManager.I?.player)
             {
-                GameManager.I.player.curWeapon = items[selectedIdx].weaponIdx;
+                GameManager.I.player.SwitchToSlot(items[selectedIdx].weaponIdx);
             }
         }
         RefreshGrid();
@@ -595,6 +703,140 @@ public class AttacheCase : MonoBehaviour
             }
         }
         return false;
+    }
+
+    void HandleDirectionalSelection()
+    {
+        Vector2Int dir = Vector2Int.zero;
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) dir = Vector2Int.left;
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) dir = Vector2Int.right;
+        else if (Input.GetKeyDown(KeyCode.UpArrow)) dir = Vector2Int.up;
+        else if (Input.GetKeyDown(KeyCode.DownArrow)) dir = Vector2Int.down;
+        else return;
+
+        if (items.Count == 0) return;
+
+        if (selectedIdx < 0 || selectedIdx >= items.Count)
+        {
+            selectedIdx = 0;
+            RefreshGrid();
+            return;
+        }
+
+        int next = FindAdjacentItem(dir);
+        if (next < 0) return;
+
+        selectedIdx = next;
+        if (items[selectedIdx].type == ItemType.Weapon && GameManager.I?.player)
+            GameManager.I.player.SwitchToSlot(items[selectedIdx].weaponIdx);
+        RefreshGrid();
+    }
+
+    int FindAdjacentItem(Vector2Int dir)
+    {
+        if (selectedIdx < 0 || selectedIdx >= items.Count) return -1;
+
+        Vector2 currentCenter = GetItemCenter(items[selectedIdx]);
+        float bestScore = float.MaxValue;
+        int bestIdx = -1;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (i == selectedIdx) continue;
+
+            Vector2 delta = GetItemCenter(items[i]) - currentCenter;
+            if (dir.x < 0 && delta.x >= -0.05f) continue;
+            if (dir.x > 0 && delta.x <= 0.05f) continue;
+            if (dir.y < 0 && delta.y >= -0.05f) continue;
+            if (dir.y > 0 && delta.y <= 0.05f) continue;
+
+            float primary = dir.x != 0 ? Mathf.Abs(delta.x) : Mathf.Abs(delta.y);
+            float secondary = dir.x != 0 ? Mathf.Abs(delta.y) : Mathf.Abs(delta.x);
+            float score = primary * 5f + secondary;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+
+        return bestIdx;
+    }
+
+    Vector2 GetItemCenter(CaseItem item)
+    {
+        return new Vector2(item.gx + item.ActualW * .5f, -(item.gy + item.ActualH * .5f));
+    }
+
+    int FindItemIndexById(int itemId)
+    {
+        if (itemId == 0) return -1;
+        for (int i = 0; i < items.Count; i++)
+            if (items[i].id == itemId) return i;
+        return -1;
+    }
+
+    int CompareItemsForPacking(CaseItem a, CaseItem b)
+    {
+        int typeCompare = GetPackingTypeRank(a.type).CompareTo(GetPackingTypeRank(b.type));
+        if (typeCompare != 0) return typeCompare;
+
+        int areaA = a.ActualW * a.ActualH;
+        int areaB = b.ActualW * b.ActualH;
+        int areaCompare = areaB.CompareTo(areaA);
+        if (areaCompare != 0) return areaCompare;
+
+        int widthCompare = b.ActualW.CompareTo(a.ActualW);
+        if (widthCompare != 0) return widthCompare;
+
+        return string.Compare(a.name, b.name, StringComparison.Ordinal);
+    }
+
+    int GetPackingTypeRank(ItemType type)
+    {
+        switch (type)
+        {
+            case ItemType.Weapon: return 0;
+            case ItemType.Ammo: return 1;
+            case ItemType.Herb: return 2;
+            case ItemType.Grenade: return 3;
+            default: return 4;
+        }
+    }
+
+    bool TryPlaceAuto(CaseItem item)
+    {
+        bool originalRotation = item.rotated;
+        Vector2Int pos = FindSpace(item.ActualW, item.ActualH);
+        if (pos.x >= 0)
+        {
+            item.gx = pos.x;
+            item.gy = pos.y;
+            PlaceOnGrid(item);
+            return true;
+        }
+
+        if (item.w == item.h) return false;
+
+        item.rotated = !item.rotated;
+        pos = FindSpace(item.ActualW, item.ActualH);
+        if (pos.x >= 0)
+        {
+            item.gx = pos.x;
+            item.gy = pos.y;
+            PlaceOnGrid(item);
+            return true;
+        }
+
+        item.rotated = originalRotation;
+        return false;
+    }
+
+    void UpdateCaseMeta()
+    {
+        if (sizeText)
+            sizeText.text = $"Grid: {gridW}x{gridH}  |  Items: {items.Count}";
     }
 
     // ====================================================================

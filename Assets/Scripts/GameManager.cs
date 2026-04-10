@@ -16,11 +16,22 @@ public class GameManager : MonoBehaviour
     [HideInInspector] public GState State = GState.Title;
     [HideInInspector] public int wave, kills, enemiesAlive;
     float waveIntroTimer;
+    bool waveRewardGranted;
+    [HideInInspector] public int merchantDiscountPercent, lastWaveBonus;
+    [HideInInspector] public float lastWaveAccuracy;
+    [HideInInspector] public bool lastWavePerfect;
+    [HideInInspector] public bool blueNoticeCollected, blueRequestActive, blueRewardClaimed;
+    [HideInInspector] public int blueMedallionsDestroyed;
+    const int BLUE_MEDALLION_TOTAL = 15;
+    bool[] blueMedallionFlags = new bool[BLUE_MEDALLION_TOTAL];
 
     [HideInInspector] public Player player;
     [HideInInspector] public GameUI ui;
     Transform enemyParent;
+    Transform medallionParent;
     GameObject merchantObj;
+    GameObject blueNoticeObj;
+    GState lastMusicState = (GState)(-1);
 
     public const int MW = 70, MH = 70;
     int[,] map = new int[MW, MH];
@@ -60,6 +71,8 @@ public class GameManager : MonoBehaviour
         BuildBonfire();
         BuildChurch();
         BuildMerchant();
+        BuildBlueMedallionRequest();
+        SpawnEnvironmentOverrides();
         SetupLighting();
         SpawnPlayer();
         enemyParent = new GameObject("Enemies").transform;
@@ -229,16 +242,22 @@ public class GameManager : MonoBehaviour
     void PlaceBarrel(Transform p, System.Random r)
     {
         var pos = Rnd(r); if (pos == Vector3.zero) return;
+        var root = new GameObject("Barrel");
+        root.transform.SetParent(p);
+        root.transform.position = pos;
+        root.transform.rotation = Quaternion.Euler(0, r.Next(0, 360), 0);
+        root.AddComponent<BreakableProp>().Init(BreakableProp.PropType.Barrel, 24f, .55f);
+
         var b = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        b.transform.SetParent(p); b.isStatic = true;
-        b.transform.position = pos + Vector3.up * .5f;
+        b.transform.SetParent(root.transform, false);
+        b.transform.localPosition = Vector3.up * .5f;
         b.transform.localScale = new Vector3(.4f, .5f, .4f);
         b.GetComponent<Renderer>().material = matWood;
         for (int i = 0; i < 3; i++)
         {
             var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.transform.SetParent(p); ring.isStatic = true;
-            ring.transform.position = pos + Vector3.up * (.15f + i * .35f);
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localPosition = Vector3.up * (.15f + i * .35f);
             ring.transform.localScale = new Vector3(.44f, .015f, .44f);
             ring.GetComponent<Renderer>().material = matMetal;
             Destroy(ring.GetComponent<Collider>());
@@ -248,11 +267,16 @@ public class GameManager : MonoBehaviour
     void PlaceCrate(Transform p, System.Random r)
     {
         var pos = Rnd(r); if (pos == Vector3.zero) return;
+        var root = new GameObject("Crate");
+        root.transform.SetParent(p);
+        root.transform.position = pos;
+        root.transform.rotation = Quaternion.Euler(0, r.Next(0, 360), 0);
+        root.AddComponent<BreakableProp>().Init(BreakableProp.PropType.Crate, 18f, .65f);
+
         var c = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        c.transform.SetParent(p); c.isStatic = true;
-        c.transform.position = pos + Vector3.up * .35f;
+        c.transform.SetParent(root.transform, false);
+        c.transform.localPosition = Vector3.up * .35f;
         c.transform.localScale = Vector3.one * .7f;
-        c.transform.rotation = Quaternion.Euler(0, r.Next(0, 360), 0);
         c.GetComponent<Renderer>().material = matWood;
     }
 
@@ -527,6 +551,60 @@ public class GameManager : MonoBehaviour
         merchantObj.SetActive(false);
     }
 
+    void BuildBlueMedallionRequest()
+    {
+        medallionParent = new GameObject("BlueMedallions").transform;
+
+        blueNoticeObj = new GameObject("BlueNotice");
+        blueNoticeObj.transform.position = merchantPos + new Vector3(-1.5f, 1.4f, 1.6f);
+        var notice = blueNoticeObj.AddComponent<BlueMedallionNotice>();
+        notice.message = "Blue medallions request started.";
+
+        var board = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        board.transform.SetParent(blueNoticeObj.transform, false);
+        board.transform.localScale = new Vector3(.45f, .3f, .03f);
+        board.GetComponent<Renderer>().material = Mat(new Color32(80, 100, 165, 255));
+
+        SpawnBlueMedallion(0, new Vector3(10f, 2.8f, 11f));
+        SpawnBlueMedallion(1, new Vector3(15f, 3.3f, 9f));
+        SpawnBlueMedallion(2, new Vector3(13f, 3f, 43f));
+        SpawnBlueMedallion(3, new Vector3(9f, 2.6f, 48f));
+        SpawnBlueMedallion(4, new Vector3(22f, 2.7f, 21f));
+        SpawnBlueMedallion(5, new Vector3(29f, 3f, 19f));
+        SpawnBlueMedallion(6, new Vector3(26f, 2.4f, 34f));
+        SpawnBlueMedallion(7, new Vector3(35f, 2.9f, 10f));
+        SpawnBlueMedallion(8, new Vector3(41f, 3.1f, 24f));
+        SpawnBlueMedallion(9, new Vector3(46f, 2.8f, 28f));
+        SpawnBlueMedallion(10, new Vector3(48f, 3f, 58f));
+        SpawnBlueMedallion(11, new Vector3(56f, 3.1f, 54f));
+        SpawnBlueMedallion(12, new Vector3(55f, 4.2f, 15f));
+        SpawnBlueMedallion(13, new Vector3(60f, 2.7f, 50f));
+        SpawnBlueMedallion(14, new Vector3(18f, 2.5f, 25f));
+    }
+
+    void SpawnBlueMedallion(int index, Vector3 pos)
+    {
+        var medallion = new GameObject("BlueMedallion");
+        medallion.transform.SetParent(medallionParent);
+        medallion.transform.position = pos;
+        medallion.AddComponent<BlueMedallion>().Init(index);
+        if (index >= 0 && index < blueMedallionFlags.Length && blueMedallionFlags[index])
+            medallion.SetActive(false);
+
+        var plate = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        plate.transform.SetParent(medallion.transform, false);
+        plate.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        plate.transform.localScale = new Vector3(.3f, .015f, .3f);
+        plate.GetComponent<Renderer>().material = MatEmissive(new Color32(60, 120, 230, 255), new Color(.2f, .45f, 1.2f));
+
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        ring.transform.SetParent(medallion.transform, false);
+        ring.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        ring.transform.localScale = new Vector3(.34f, .01f, .34f);
+        ring.GetComponent<Renderer>().material = matMetal;
+        Destroy(ring.GetComponent<Collider>());
+    }
+
     // ====================================================================
     // ILUMINAÇÃO
     // ====================================================================
@@ -554,27 +632,164 @@ public class GameManager : MonoBehaviour
         player = o.AddComponent<Player>();
     }
 
+    void SpawnEnvironmentOverrides()
+    {
+        var overlay = VisualOverrideLoader.InstantiateWorldPrefab(
+            "Overrides/VillageOverlay",
+            new Vector3(MW * .5f, 0, MH * .5f),
+            Vector3.zero,
+            Vector3.one);
+
+        if (overlay)
+            overlay.name = "VillageOverlay";
+    }
+
     // ====================================================================
     // UPDATE
     // ====================================================================
     void Update()
     {
+        SyncAudioState();
         if (State == GState.Title)
         { if (Input.anyKeyDown && !Input.GetKeyDown(KeyCode.Escape)) { State = GState.Playing; Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; StartWave(); } return; }
         if (State == GState.Dead)
         { if (Input.GetKeyDown(KeyCode.R)) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); return; }
         if (State == GState.WaveIntro) { waveIntroTimer -= Time.deltaTime; if (waveIntroTimer <= 0) State = GState.Playing; return; }
         if (State == GState.Playing && enemiesAlive <= 0 && wave > 0)
-        { State = GState.Merchant; merchantObj.SetActive(true); Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+        {
+            CompleteWaveRewards();
+            State = GState.Merchant;
+            merchantObj.SetActive(true);
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            if (SaveSystem.I) SaveSystem.I.Save(0, true);
+            if (ui) ui.ShowStatusMessage("AREA CLEAR - MERCHANT OPEN", new Color32(215, 185, 90, 255), 2.4f);
+        }
+
     }
 
     public void CloseMerchant()
-    { merchantObj.SetActive(false); State = GState.Playing; Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; StartWave(); }
-
-    void StartWave()
     {
-        wave++; waveIntroTimer = 2.5f; State = GState.WaveIntro;
-        int count = 4 + wave * 3; enemiesAlive = count;
+        merchantObj.SetActive(false);
+        State = GState.Playing;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        if (ui) ui.ShowStatusMessage("GET READY...", new Color32(220, 165, 90, 255), 1.2f);
+        StartWave();
+    }
+
+    public void ActivateBlueMedallionRequest()
+    {
+        blueNoticeCollected = true;
+        blueRequestActive = true;
+        if (blueNoticeObj) blueNoticeObj.SetActive(false);
+        if (ui)
+            ui.ShowStatusMessage("BLUE MEDALLIONS REQUEST STARTED", new Color32(80, 150, 255, 255), 2f);
+    }
+
+    public void OnBlueMedallionDestroyed(int index)
+    {
+        if (index >= 0 && index < blueMedallionFlags.Length && !blueMedallionFlags[index])
+        {
+            blueMedallionFlags[index] = true;
+            blueMedallionsDestroyed = Mathf.Clamp(blueMedallionsDestroyed + 1, 0, BLUE_MEDALLION_TOTAL);
+        }
+
+        if (!blueRequestActive)
+            blueRequestActive = true;
+
+        if (ui)
+            ui.ShowStatusMessage($"BLUE MEDALLION {blueMedallionsDestroyed}/{BLUE_MEDALLION_TOTAL}", new Color32(80, 150, 255, 255), 1.25f);
+
+        if (blueMedallionsDestroyed >= BLUE_MEDALLION_TOTAL && ui)
+            ui.ShowStatusMessage("ALL BLUE MEDALLIONS DESTROYED", new Color32(95, 205, 255, 255), 2f);
+    }
+
+    public bool CanClaimPunisherReward()
+    {
+        return blueRequestActive && blueMedallionsDestroyed >= 10 && !blueRewardClaimed && player;
+    }
+
+    public string GetBlueMedallionStatusText()
+    {
+        if (!blueRequestActive && !blueNoticeCollected)
+            return "Find the blue request note near the merchant.";
+        if (blueRewardClaimed)
+            return "Punisher reward claimed.";
+        if (blueMedallionsDestroyed >= BLUE_MEDALLION_TOTAL)
+            return "All medallions destroyed. Return to the merchant.";
+        return $"Blue Medallions: {blueMedallionsDestroyed}/{BLUE_MEDALLION_TOTAL}";
+    }
+
+    public string GetBlueMedallionRewardLabel()
+    {
+        return blueMedallionsDestroyed >= BLUE_MEDALLION_TOTAL ? "Claim Punisher + Special Pierce" : "Claim Punisher";
+    }
+
+    public string GetBlueMedallionRewardDetail()
+    {
+        return blueMedallionsDestroyed >= BLUE_MEDALLION_TOTAL ?
+            "Original request reward with the full piercing bonus." :
+            "Unlocks the Punisher handgun variant.";
+    }
+
+    public bool ClaimPunisherReward()
+    {
+        if (!CanClaimPunisherReward() || !player) return false;
+
+        bool special = blueMedallionsDestroyed >= BLUE_MEDALLION_TOTAL;
+        if (!player.UnlockPunisher(special)) return false;
+
+        blueRewardClaimed = true;
+        if (ui)
+            ui.ShowStatusMessage(special ? "PUNISHER WITH SPECIAL PIERCE ACQUIRED" : "PUNISHER ACQUIRED",
+                new Color32(95, 205, 255, 255), 2f);
+        return true;
+    }
+
+    public bool[] GetBlueMedallionFlagsCopy()
+    {
+        var copy = new bool[blueMedallionFlags.Length];
+        blueMedallionFlags.CopyTo(copy, 0);
+        return copy;
+    }
+
+    public void ApplyBlueMedallionState(bool noteCollected, bool requestActive, int destroyed, bool rewardClaimed, bool[] flags)
+    {
+        blueNoticeCollected = noteCollected;
+        blueRequestActive = requestActive;
+        blueRewardClaimed = rewardClaimed;
+        blueMedallionsDestroyed = Mathf.Clamp(destroyed, 0, BLUE_MEDALLION_TOTAL);
+
+        for (int i = 0; i < blueMedallionFlags.Length; i++)
+            blueMedallionFlags[i] = flags != null && i < flags.Length && flags[i];
+
+        if (blueNoticeObj)
+            blueNoticeObj.SetActive(!blueNoticeCollected);
+        if (!medallionParent) return;
+
+        for (int i = 0; i < medallionParent.childCount && i < blueMedallionFlags.Length; i++)
+            medallionParent.GetChild(i).gameObject.SetActive(!blueMedallionFlags[i]);
+    }
+
+    int EnemyCountForWave(int waveIndex) => 4 + waveIndex * 3;
+
+    void StartWave(int forcedWave = -1, int forcedCount = -1)
+    {
+        wave = forcedWave > 0 ? forcedWave : wave + 1;
+        waveIntroTimer = forcedWave > 0 ? 1.2f : 2.5f;
+        State = GState.WaveIntro;
+        ClearActiveEnemies();
+        waveRewardGranted = false;
+        merchantDiscountPercent = 0;
+        lastWaveBonus = 0;
+        lastWaveAccuracy = 0f;
+        lastWavePerfect = false;
+        if (player) player.BeginWaveStats();
+
+        int count = forcedCount > 0 ? forcedCount : EnemyCountForWave(wave);
+        enemiesAlive = count;
+        if (ui) ui.ShowStatusMessage($"WAVE {wave} START", new Color32(225, 200, 105, 255), 2f);
         for (int i = 0; i < count; i++)
         {
             if (spawnPts.Count == 0) break;
@@ -595,15 +810,140 @@ public class GameManager : MonoBehaviour
         if (wave >= 5 && roll < .08f) t = Enemy.EType.Chainsaw;
         else if (wave >= 3 && roll < .2f) t = Enemy.EType.Heavy;
         else if (wave >= 2 && roll < .4f) t = Enemy.EType.Pitchfork;
-        e.Init(t);
+        e.Init(t, alertedOnSpawn: true);
     }
 
     public void OnEnemyDied(Vector3 pos, Enemy.EType type)
     {
         enemiesAlive = Mathf.Max(0, enemiesAlive - 1); kills++;
-        if (player) player.money += type == Enemy.EType.Chainsaw ? 500 : Random.Range(80, 250);
-        if (Random.value < (type == Enemy.EType.Chainsaw ? .8f : .3f))
-        { var pk = new GameObject("Pickup"); pk.transform.position = pos + Vector3.up * .3f; pk.AddComponent<Pickup>().Init(); }
+
+        bool richDrop = type == Enemy.EType.Chainsaw || type == Enemy.EType.Heavy;
+        float dropChance = type == Enemy.EType.Chainsaw ? .95f :
+                           type == Enemy.EType.Heavy ? .55f : .4f;
+        if (Random.value < dropChance)
+        {
+            var pk = new GameObject("Pickup");
+            pk.transform.position = pos + Vector3.up * .3f;
+            pk.AddComponent<Pickup>().Init(richDrop);
+        }
+
+        if (type == Enemy.EType.Heavy && Random.value < .35f)
+        {
+            var moneyDrop = new GameObject("PesetasPickup");
+            moneyDrop.transform.position = pos + new Vector3(.18f, .3f, -.12f);
+            moneyDrop.AddComponent<Pickup>().InitMoney(Random.Range(420, 760));
+        }
+
+        if (type == Enemy.EType.Chainsaw)
+        {
+            var moneyDrop = new GameObject("PesetasPickup");
+            moneyDrop.transform.position = pos + new Vector3(-.15f, .3f, .1f);
+            moneyDrop.AddComponent<Pickup>().InitMoney(Random.Range(1200, 2200));
+
+            var treasure = new GameObject("TreasurePickup");
+            treasure.transform.position = pos + Vector3.up * .45f;
+            var pickup = treasure.AddComponent<Pickup>();
+            pickup.InitTreasure(Random.value < .7f ? Pickup.TreasureType.Ruby : Pickup.TreasureType.Pendant);
+        }
+        if (type == Enemy.EType.Chainsaw && ui)
+            ui.ShowStatusMessage("CHAINSAW THREAT ELIMINATED", new Color32(220, 80, 70, 255), 1.8f);
+    }
+
+    void CompleteWaveRewards()
+    {
+        if (waveRewardGranted || !player) return;
+
+        waveRewardGranted = true;
+        lastWaveAccuracy = player.GetWaveAccuracy();
+        lastWavePerfect = player.GetWaveDamageTaken() <= .01f;
+
+        int baseReward = 180 + wave * 90;
+        int accuracyReward = lastWaveAccuracy >= .8f ? 220 + wave * 30 :
+                             lastWaveAccuracy >= .6f ? 120 + wave * 20 : 0;
+        int perfectReward = lastWavePerfect ? 180 + wave * 45 : 0;
+
+        lastWaveBonus = baseReward + accuracyReward + perfectReward;
+        player.money += lastWaveBonus;
+
+        merchantDiscountPercent = Mathf.Clamp((wave - 1) * 2 + (lastWaveAccuracy >= .75f ? 4 : 0) + (lastWavePerfect ? 6 : 0), 0, 24);
+
+        if (ui)
+        {
+            string label = $"WAVE BONUS +{lastWaveBonus}";
+            if (lastWavePerfect) label += "  PERFECT";
+            ui.ShowStatusMessage(label, new Color32(225, 200, 105, 255), 2.2f);
+        }
+    }
+
+    public void RestoreProgress(int savedWave, int savedKills, int enemiesRemaining, GState savedState,
+        int savedDiscount = 0, int savedBonus = 0, float savedAccuracy = 0f, bool savedPerfect = false)
+    {
+        kills = Mathf.Max(0, savedKills);
+        merchantDiscountPercent = Mathf.Clamp(savedDiscount, 0, 24);
+        lastWaveBonus = Mathf.Max(0, savedBonus);
+        lastWaveAccuracy = Mathf.Clamp01(savedAccuracy);
+        lastWavePerfect = savedPerfect;
+        merchantObj.SetActive(false);
+        ClearActiveEnemies();
+
+        if (savedWave <= 0)
+        {
+            wave = 0;
+            enemiesAlive = 0;
+            State = GState.Playing;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            return;
+        }
+
+        if (savedState == GState.Merchant || enemiesRemaining <= 0)
+        {
+            wave = savedWave;
+            enemiesAlive = 0;
+            waveRewardGranted = true;
+            State = GState.Merchant;
+            merchantObj.SetActive(true);
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            if (ui) ui.ShowStatusMessage("MERCHANT RESTORED", new Color32(215, 185, 90, 255), 1.8f);
+            return;
+        }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        StartWave(savedWave, enemiesRemaining);
+    }
+
+    public int GetMerchantPrice(int basePrice)
+    {
+        float mult = 1f - merchantDiscountPercent / 100f;
+        return Mathf.Max(50, Mathf.RoundToInt(basePrice * mult));
+    }
+
+    void ClearActiveEnemies()
+    {
+        if (!enemyParent) return;
+        for (int i = enemyParent.childCount - 1; i >= 0; i--)
+        {
+            var enemy = enemyParent.GetChild(i).gameObject;
+            enemy.SetActive(false);
+            Destroy(enemy);
+        }
+    }
+
+    void SyncAudioState()
+    {
+        if (!AudioManager.I || lastMusicState == State) return;
+
+        lastMusicState = State;
+        switch (State)
+        {
+            case GState.Title: AudioManager.I.PlayMusic(AudioManager.Music.Ambient); break;
+            case GState.WaveIntro: AudioManager.I.PlayMusic(AudioManager.Music.WaveIntro); break;
+            case GState.Playing: AudioManager.I.PlayMusic(enemiesAlive > 0 ? AudioManager.Music.Combat : AudioManager.Music.Ambient); break;
+            case GState.Merchant: AudioManager.I.PlayMusic(AudioManager.Music.Merchant); break;
+            case GState.Dead: AudioManager.I.PlayMusic(AudioManager.Music.Dead); break;
+        }
     }
 
     public void PlayerDied() { State = GState.Dead; Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }

@@ -1,0 +1,14 @@
+Drop legal Unity prefabs into this Resources folder to override the procedural visuals.
+
+Expected prefab resource names:
+- Overrides/PlayerLeon
+- Overrides/EnemyGanado
+- Overrides/EnemyGanadoPitchfork
+- Overrides/EnemyGanadoHeavy
+- Overrides/EnemyChainsaw
+- Overrides/VillageOverlay
+
+Notes:
+- The game still uses code-driven hitboxes and gameplay.
+- Enemy prefabs are visual-only; colliders and combat come from runtime hitboxes.
+- VillageOverlay is spawned around the center of the procedural map.

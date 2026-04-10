@@ -12,9 +12,12 @@ public class Enemy : MonoBehaviour
     public EType type;
 
     public float hp, maxHp, speed, damage, attackRate, attackRange;
+    public float autoAlertRange = 7.5f;
     float nextAttack, staggerTimer;
     bool isDead;
+    bool isGrabbing;
     Vector3 knockbackVel;
+    Coroutine burnRoutine;
 
     // Propriedade pública para sistema de chute
     public bool IsStaggered => staggerTimer > 0 && !isDead;
@@ -24,7 +27,8 @@ public class Enemy : MonoBehaviour
     public bool IsDead => isDead;
 
     /// <summary>True quando o inimigo está ativamente perseguindo o jogador.</summary>
-    public bool IsChasing => !isDead && staggerTimer <= 0 && knockbackVel.magnitude < .1f;
+    public bool IsChasing => _alerted && !isDead && staggerTimer <= 0 && knockbackVel.magnitude < .1f;
+    public bool IsAlerted => _alerted;
 
     bool _alerted = false;
 
@@ -34,6 +38,7 @@ public class Enemy : MonoBehaviour
     /// pode ser usado para resetar estados de patrulha.
     /// </summary>
     public void Alert(Transform target) { _alerted = true; }
+    public void SetAlerted(bool alerted) => _alerted = alerted;
 
     CharacterController cc;
     GameObject body, head, legL, legR, armL, armR, weaponObj;
@@ -42,9 +47,10 @@ public class Enemy : MonoBehaviour
     Vector3 lastPos; float stuckTimer;
 
     // ====================================================================
-    public void Init(EType t)
+    public void Init(EType t, bool alertedOnSpawn = false)
     {
         type = t;
+        _alerted = alertedOnSpawn;
         switch (t)
         {
             case EType.Villager:   hp = maxHp = 60;  speed = 2.2f; damage = 12; attackRange = 2f;   break;
@@ -60,11 +66,43 @@ public class Enemy : MonoBehaviour
         BuildBody();
     }
 
+    IEnumerator GrabAnim()
+    {
+        float t = 0f;
+        while (t < .25f && isGrabbing)
+        {
+            t += Time.deltaTime;
+            AnimateGrabHold();
+            yield return null;
+        }
+    }
+
+    bool CanAttemptGrab(Player player, float dist)
+    {
+        if (!player || player.IsGrabbed || type == EType.Chainsaw) return false;
+        if (dist > attackRange * .92f) return false;
+
+        float chance = type == EType.Heavy ? .35f : .2f;
+        return Random.value < chance;
+    }
+
+    public void ForceGrabBreak(Vector3 knockback, bool stagger)
+    {
+        isGrabbing = false;
+        if (stagger)
+            staggerTimer = Mathf.Max(staggerTimer, .7f);
+        knockbackVel = knockback;
+        knockbackVel.y = Mathf.Max(knockbackVel.y, 1.5f);
+    }
+
     // ====================================================================
     // CORPO (Ganado RE4-style)
     // ====================================================================
     void BuildBody()
     {
+        if (TryBuildVisualOverride())
+            return;
+
         Color32 clothCol, pantsCol, skinCol;
         switch (type)
         {
@@ -124,6 +162,59 @@ public class Enemy : MonoBehaviour
         hpBarFill = MakeQuad(new Vector3(0, 0, -.01f), new Vector3(.95f, .8f, 1),
             type == EType.Chainsaw ? new Color32(200, 50, 200, 255) : new Color32(180, 20, 20, 255));
         hpBarFill.transform.SetParent(hpBarBg.transform, false);
+    }
+
+    bool TryBuildVisualOverride()
+    {
+        string path = null;
+        switch (type)
+        {
+            case EType.Villager: path = "Overrides/EnemyGanado"; break;
+            case EType.Pitchfork: path = "Overrides/EnemyGanadoPitchfork"; break;
+            case EType.Heavy: path = "Overrides/EnemyGanadoHeavy"; break;
+            case EType.Chainsaw: path = "Overrides/EnemyChainsaw"; break;
+        }
+
+        var visual = VisualOverrideLoader.InstantiatePrefab(
+            path,
+            transform,
+            new Vector3(0, -.9f, 0),
+            Vector3.zero,
+            Vector3.one);
+
+        if (!visual) return false;
+
+        visual.name = "VisualOverride";
+        BuildInvisibleRig();
+        return true;
+    }
+
+    void BuildInvisibleRig()
+    {
+        legL = HiddenPrim(PrimitiveType.Cube, new Vector3(-.15f, .4f, 0), new Vector3(.18f, .8f, .2f), false, "LegL");
+        legR = HiddenPrim(PrimitiveType.Cube, new Vector3(.15f, .4f, 0),  new Vector3(.18f, .8f, .2f), false, "LegR");
+        body = HiddenPrim(PrimitiveType.Cube, new Vector3(0, 1.15f, 0), new Vector3(.5f, .75f, .28f), true, "Body");
+        armL = HiddenPrim(PrimitiveType.Cube, new Vector3(-.32f, 1.1f, 0), new Vector3(.12f, .6f, .14f), false, "ArmL");
+        armR = HiddenPrim(PrimitiveType.Cube, new Vector3(.32f, 1.1f, 0),  new Vector3(.12f, .6f, .14f), false, "ArmR");
+        head = HiddenPrim(PrimitiveType.Sphere, new Vector3(0, 1.78f, 0), Vector3.one * .3f, true, "Head");
+
+        hpBarBg = MakeQuad(new Vector3(0, 2.3f, 0), new Vector3(.6f, .06f, 1), new Color32(0, 0, 0, 180));
+        hpBarFill = MakeQuad(new Vector3(0, 0, -.01f), new Vector3(.95f, .8f, 1),
+            type == EType.Chainsaw ? new Color32(200, 50, 200, 255) : new Color32(180, 20, 20, 255));
+        hpBarFill.transform.SetParent(hpBarBg.transform, false);
+    }
+
+    GameObject HiddenPrim(PrimitiveType pt, Vector3 lp, Vector3 ls, bool keepCol, string objName)
+    {
+        var g = GameObject.CreatePrimitive(pt);
+        g.name = objName;
+        g.transform.SetParent(transform);
+        g.transform.localPosition = lp;
+        g.transform.localScale = ls;
+        var renderer = g.GetComponent<Renderer>();
+        if (renderer) renderer.enabled = false;
+        if (!keepCol) Destroy(g.GetComponent<Collider>());
+        return g;
     }
 
     void BuildWeapon()
@@ -188,6 +279,27 @@ public class Enemy : MonoBehaviour
         var player = GameManager.I.player;
         if (!player) return;
 
+        Vector3 dir = player.transform.position - transform.position;
+        dir.y = 0;
+        float dist = dir.magnitude;
+
+        if (!_alerted && dist <= autoAlertRange)
+            _alerted = true;
+
+        if (player.IsGrabbed && player.CurrentGrabber == this)
+        {
+            isGrabbing = true;
+            if (dist > .15f)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir.normalized), Time.deltaTime * 10f);
+            AnimateGrabHold();
+            UpdateHpBar();
+            return;
+        }
+        else
+        {
+            isGrabbing = false;
+        }
+
         // Stagger
         if (staggerTimer > 0) { staggerTimer -= Time.deltaTime; AnimateStagger(); }
 
@@ -201,9 +313,12 @@ public class Enemy : MonoBehaviour
 
         if (staggerTimer > 0) return;
 
-        Vector3 dir = player.transform.position - transform.position;
-        dir.y = 0;
-        float dist = dir.magnitude;
+        if (!_alerted)
+        {
+            AnimateIdle();
+            UpdateHpBar();
+            return;
+        }
 
         if (dist > .2f)
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 4);
@@ -230,12 +345,24 @@ public class Enemy : MonoBehaviour
             if (Time.time >= nextAttack)
             {
                 nextAttack = Time.time + attackRate;
-                StartCoroutine(AttackAnim());
-                player.TakeDamage(damage);
+                if (CanAttemptGrab(player, dist) && player.TryBeginGrab(this, type == EType.Heavy ? 2.8f : 2.2f, type == EType.Heavy ? 11f : 8f, type == EType.Heavy ? 9 : 7))
+                {
+                    isGrabbing = true;
+                    StartCoroutine(GrabAnim());
+                }
+                else
+                {
+                    StartCoroutine(AttackAnim());
+                    player.TakeDamage(damage);
+                }
             }
         }
 
-        // HP bar billboard
+        UpdateHpBar();
+    }
+
+    void UpdateHpBar()
+    {
         if (hpBarBg && Camera.main)
         {
             hpBarBg.transform.LookAt(Camera.main.transform);
@@ -246,6 +373,64 @@ public class Enemy : MonoBehaviour
     }
 
     // ── Animações procedurais ──────────────────────────────────────────────
+    public void ApplyFlash(float duration)
+    {
+        if (isDead) return;
+        _alerted = true;
+        if (isGrabbing && GameManager.I && GameManager.I.player)
+            GameManager.I.player.ReleaseGrabFromEnemy(this, true);
+        staggerTimer = Mathf.Max(staggerTimer, type == EType.Chainsaw ? duration * .65f : duration);
+        knockbackVel = Vector3.zero;
+        StartCoroutine(FlashWhite());
+    }
+
+    public void Ignite(float totalDamage, float duration)
+    {
+        if (isDead) return;
+        _alerted = true;
+        if (burnRoutine != null) StopCoroutine(burnRoutine);
+        burnRoutine = StartCoroutine(BurnRoutine(totalDamage, duration));
+    }
+
+    IEnumerator BurnRoutine(float totalDamage, float duration)
+    {
+        float tick = .35f;
+        float elapsed = 0f;
+
+        while (elapsed < duration && !isDead)
+        {
+            yield return new WaitForSeconds(tick);
+            elapsed += tick;
+            if (isDead) yield break;
+
+            hp -= totalDamage * (tick / Mathf.Max(.1f, duration));
+            staggerTimer = Mathf.Max(staggerTimer, .15f);
+            StartCoroutine(FlashBurn());
+
+            if (hp <= 0)
+            {
+                isDead = true;
+                if (isGrabbing && GameManager.I && GameManager.I.player)
+                    GameManager.I.player.ReleaseGrabFromEnemy(this, true);
+                if (AudioManager.I) AudioManager.I.PlaySFX(AudioManager.SFX.EnemyDeath, transform.position);
+                GameManager.I.OnEnemyDied(transform.position, type);
+                Destroy(gameObject);
+                yield break;
+            }
+        }
+
+        burnRoutine = null;
+    }
+
+    void AnimateIdle()
+    {
+        float t = Time.time * 1.5f + transform.position.x * .15f;
+        if (armL) armL.transform.localRotation = Quaternion.Euler(Mathf.Sin(t) * 6, 0, 0);
+        if (armR) armR.transform.localRotation = Quaternion.Euler(-Mathf.Sin(t) * 6, 0, 0);
+        if (body) body.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(t * .5f) * 2.5f);
+        if (head) head.transform.localRotation = Quaternion.Euler(0, Mathf.Sin(t * .8f) * 12f, 0);
+    }
+
     void AnimateWalk()
     {
         float t = Time.time * speed * 2.5f;
@@ -261,6 +446,13 @@ public class Enemy : MonoBehaviour
     {
         if (body) body.transform.localPosition = new Vector3(0, 1.15f, -.1f);
         if (head) head.transform.localPosition = new Vector3(0, 1.65f, -.1f);
+    }
+
+    void AnimateGrabHold()
+    {
+        if (armL) armL.transform.localRotation = Quaternion.Euler(-55, 10, 0);
+        if (armR) armR.transform.localRotation = Quaternion.Euler(-55, -10, 0);
+        if (body) body.transform.localRotation = Quaternion.Euler(8, 0, 0);
     }
 
     IEnumerator AttackAnim()
@@ -282,11 +474,15 @@ public class Enemy : MonoBehaviour
     public void TakeDamage(float dmg, bool headshot)
     {
         if (isDead) return;
+        _alerted = true;
+        if (isGrabbing && GameManager.I && GameManager.I.player)
+            GameManager.I.player.ReleaseGrabFromEnemy(this, true);
         hp -= dmg;
 
         if (hp <= 0)
         {
             isDead = true;
+            if (AudioManager.I) AudioManager.I.PlaySFX(AudioManager.SFX.EnemyDeath, transform.position);
             GameManager.I.OnEnemyDied(transform.position, type);
             if (headshot) StartCoroutine(HeadshotDeath()); else Destroy(gameObject);
             return;
@@ -296,6 +492,7 @@ public class Enemy : MonoBehaviour
         if (type != EType.Chainsaw || headshot)
             staggerTimer = .35f;
 
+        if (AudioManager.I) AudioManager.I.PlaySFX(AudioManager.SFX.EnemyHurt, transform.position);
         StartCoroutine(FlashRed());
     }
 
@@ -305,6 +502,9 @@ public class Enemy : MonoBehaviour
     public void TakeKickDamage(float dmg, Vector3 knockback)
     {
         if (isDead) return;
+        _alerted = true;
+        if (isGrabbing && GameManager.I && GameManager.I.player)
+            GameManager.I.player.ReleaseGrabFromEnemy(this, true);
         hp -= dmg;
 
         // Knockback forte
@@ -320,6 +520,7 @@ public class Enemy : MonoBehaviour
         if (hp <= 0)
         {
             isDead = true;
+            if (AudioManager.I) AudioManager.I.PlaySFX(AudioManager.SFX.EnemyDeath, transform.position);
             GameManager.I.OnEnemyDied(transform.position, type);
             StartCoroutine(KickDeath(knockback));
             return;
@@ -335,6 +536,26 @@ public class Enemy : MonoBehaviour
         yield return new WaitForSeconds(.08f);
         r.material.color = new Color(1, .7f, .3f);
         yield return new WaitForSeconds(.08f);
+        if (r) r.material.color = orig;
+    }
+
+    IEnumerator FlashWhite()
+    {
+        if (!body) yield break;
+        var r = body.GetComponent<Renderer>();
+        Color orig = r.material.color;
+        r.material.color = Color.white;
+        yield return new WaitForSeconds(.12f);
+        if (r) r.material.color = orig;
+    }
+
+    IEnumerator FlashBurn()
+    {
+        if (!body) yield break;
+        var r = body.GetComponent<Renderer>();
+        Color orig = r.material.color;
+        r.material.color = new Color(1f, .45f, .08f);
+        yield return new WaitForSeconds(.1f);
         if (r) r.material.color = orig;
     }
 
@@ -367,6 +588,7 @@ public class Enemy : MonoBehaviour
 
     IEnumerator HeadshotDeath()
     {
+        if (AudioManager.I) AudioManager.I.PlaySFX(AudioManager.SFX.EnemyDeath, transform.position);
         // Cabeça explode (RE4!)
         if (head)
         {
